@@ -303,7 +303,7 @@ class Handler(Extract, GetPages):
         }
         tree = self.get_tree('https://cado.eservices.gov.nl.ca/CADOInternet/Company/CompanyNameNumberSearch.aspx',
                              headers=self.header, method='POST', data=data)
-        self.check_tree(tree)
+        # self.check_tree(tree)
 
         names = self.get_by_xpath(tree,
                                   '//table[@id="tblCurrentDirectors"]//tr//tr[@class="row"]/td[@colspan="2"]/text()',
