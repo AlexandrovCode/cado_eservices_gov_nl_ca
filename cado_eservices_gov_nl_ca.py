@@ -94,28 +94,35 @@ class Handler(Extract, GetPages):
             }
             res.append(temp)
         return res
+
     def get_post_addr(self, tree):
         addr = self.get_by_xpath(tree, '//span[@id="lblMailingAddress"]/..//text()', return_list=True)
         if addr:
-            addr = [i for i in addr if i != '' and i != 'Mailing Address:' and i != 'Inactive']
+            addr = [i for i in addr if i != '' and i != 'Mailing Address:' and i != 'Inactive' and i != 'Registered Office outside NL:']
             if addr[0] == 'No address on file':
                 return None
-            if addr[0] == 'Same as Registered Office':
+            if addr[0] == 'Same as Registered Office' or addr[0] == 'Same as Registered Office in NL':
                 return 'Same'
             fullAddr = ', '.join(addr)
             temp = {
-                'fullAddress': fullAddr if 'Canada' in fullAddr else (fullAddr + ', Canada'),
+                'fullAddress': fullAddr if 'Canada' in fullAddr else (fullAddr + ' Canada'),
                 'country': 'Canada',
 
             }
+            replace = re.findall('[A-Z]{2},\sCanada,', temp['fullAddress'])
+            if not replace:
+                replace = re.findall('[A-Z]{2},\sCanada', temp['fullAddress'])
+            if replace:
+                torepl = replace[0].replace(',', '')
+                temp['fullAddress'] = temp['fullAddress'].replace(replace[0], torepl)
             try:
                 zip = re.findall('[A-Z]\d[A-Z]\s\d[A-Z]\d', fullAddr)
                 if zip:
                     temp['zip'] = zip[0]
             except:
                 pass
-        # print(addr)
-        # print(len(addr))
+        print(addr)
+        print(len(addr))
         if len(addr) == 4:
             temp['city'] = addr[-3]
             temp['streetAddress'] = addr[0]
@@ -131,33 +138,45 @@ class Handler(Extract, GetPages):
     def get_address(self, tree):
         addr = self.get_by_xpath(tree, '//span[@id="RegisteredOffice"]/..//text()', return_list=True)
         if addr:
-
-            addr = [i for i in addr if i != '' and i!='Registered Office:']
+            addr = [i for i in addr if i != '' and i != 'Registered Office:' and i != 'Registered Office in NL:']
             if addr[0] == 'No address on file':
                 return None
 
             fullAddr = ', '.join(addr)
+
             temp = {
-                'fullAddress': fullAddr if 'Canada'in fullAddr else (fullAddr + ', Canada'),
+                'fullAddress': fullAddr if 'Canada' in fullAddr else (fullAddr + ' Canada'),
                 'country': 'Canada',
 
             }
+            replace = re.findall('[A-Z]{2},\sCanada,', temp['fullAddress'])
+            if not replace:
+                replace = re.findall('[A-Z]{2},\sCanada', temp['fullAddress'])
+            if replace:
+                torepl = replace[0].replace(',', '')
+                temp['fullAddress'] = temp['fullAddress'].replace(replace[0], torepl)
             try:
                 zip = re.findall('[A-Z]\d[A-Z]\s\d[A-Z]\d', fullAddr)
                 if zip:
                     temp['zip'] = zip[0]
             except:
                 pass
-        # print(len(addr))
-        # print(addr)
+        print(len(addr))
+        print(addr)
         if len(addr) == 4:
             temp['city'] = addr[-3]
             temp['streetAddress'] = addr[0]
         if len(addr) == 5:
-            temp['city'] = addr[-4]
+            temp['city'] = addr[-4].split(',')[0]
             temp['streetAddress'] = addr[0]
+        if len(addr) == 6:
+            temp['city'] = addr[-4]
+            temp['streetAddress'] = ', '.join(addr[:2])
+        if len(addr) == 7:
+            temp['city'] = addr[-4]
+            temp['streetAddress'] = ', '.join(addr[:4])
         if len(addr) == 2:
-            temp['city'] = addr[-1]
+            temp['city'] = addr[-1].split(',')[0]
             temp['streetAddress'] = addr[0]
         if len(addr) == 8:
             temp['city'] = addr[-4]
@@ -166,8 +185,12 @@ class Handler(Extract, GetPages):
 
     def get_prev_names(self, tree):
         prev = []
-        names = self.get_by_xpath(tree, '//table[@id="tblPreviousCompanyNames"]//tr[@class="row"]//tr[@class="row"]//td[1]/text() | //table[@id="tblPreviousCompanyNames"]//tr[@class="row"]//tr[@class="rowalt"]//td[1]/text()', return_list=True)
-        dates = self.get_by_xpath(tree, '//table[@id="tblPreviousCompanyNames"]//tr[@class="row"]//tr[@class="row"]//td[2]/span/text() | //table[@id="tblPreviousCompanyNames"]//tr[@class="row"]//tr[@class="rowalt"]//td[2]/span/text()', return_list=True)
+        names = self.get_by_xpath(tree,
+                                  '//table[@id="tblPreviousCompanyNames"]//tr[@class="row"]//tr[@class="row"]//td[1]/text() | //table[@id="tblPreviousCompanyNames"]//tr[@class="row"]//tr[@class="rowalt"]//td[1]/text()',
+                                  return_list=True)
+        dates = self.get_by_xpath(tree,
+                                  '//table[@id="tblPreviousCompanyNames"]//tr[@class="row"]//tr[@class="row"]//td[2]/span/text() | //table[@id="tblPreviousCompanyNames"]//tr[@class="row"]//tr[@class="rowalt"]//td[2]/span/text()',
+                                  return_list=True)
         if names:
             names = [i for i in names if i != '']
         if names and dates:
@@ -240,7 +263,7 @@ class Handler(Extract, GetPages):
         lf = self.get_by_xpath(tree, '//span[@id="lblFilingType"]/text()')
         if lf:
             company['lei:legalForm'] = {
-                'code':'',
+                'code': '',
                 'label': lf
             }
         prev = self.get_prev_names(tree)
@@ -259,11 +282,9 @@ class Handler(Extract, GetPages):
             else:
                 company['mdaas:PostalAddress'] = post_addr
 
-
         company['@source-id'] = self.NICK_NAME
-        #print(company['mdaas:RegisteredAddress'])
-        # print(company['mdaas:PostalAddress'])
-
+        print(company['mdaas:RegisteredAddress'])
+        print(company['mdaas:PostalAddress'])
 
         return company
 
@@ -317,6 +338,6 @@ class Handler(Extract, GetPages):
                     'occupation': 'Director',
                     'status': 'Active',
                     'information_source': self.base_url,
-                    'nformation_provider':'Newfoundland and Labrador: Department of Government Services'}
+                    'nformation_provider': 'Newfoundland and Labrador: Department of Government Services'}
             off.append(home)
         return off
